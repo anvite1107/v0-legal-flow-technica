@@ -7,10 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 
-interface Summary {
-  text: string;
-}
-
 interface Clause {
   clauseId: string;
   type: string;
@@ -38,38 +34,28 @@ export default function ResultsPage({
   params: { documentId: string };
 }) {
   const router = useRouter();
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [summary, setSummary] = useState<string>('');
   const [clauses, setClauses] = useState<Clause[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const summaryRes = await fetch(
-          `http://localhost:8000/summary?documentId=${params.documentId}`
-        );
-        if (!summaryRes.ok) throw new Error('Failed to fetch summary');
-        const summaryData = await summaryRes.json();
-        setSummary(summaryData);
-
-        const clausesRes = await fetch(
-          `http://localhost:8000/clauses?documentId=${params.documentId}`
-        );
-        if (!clausesRes.ok) throw new Error('Failed to fetch clauses');
-        const clausesData = await clausesRes.json();
-        setClauses(clausesData);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
+    try {
+      setLoading(true);
+      const storedData = localStorage.getItem(`document-${params.documentId}`);
+      
+      if (!storedData) {
+        throw new Error('Document not found');
       }
-    };
 
-    fetchData();
+      const data = JSON.parse(storedData);
+      setSummary(data.summary || '');
+      setClauses(data.clauses || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   }, [params.documentId]);
 
   if (loading) {
@@ -86,10 +72,7 @@ export default function ResultsPage({
         <div className="text-center">
           <h2 className="text-2xl font-bold text-red-600">Error</h2>
           <p className="mt-2 text-muted-foreground">{error}</p>
-          <Button
-            onClick={() => router.push('/')}
-            className="mt-4"
-          >
+          <Button onClick={() => router.push('/')} className="mt-4">
             Back to Upload
           </Button>
         </div>
@@ -105,7 +88,7 @@ export default function ResultsPage({
             <CardTitle>Contract Overview</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-foreground">{summary?.text}</p>
+            <p className="text-foreground">{summary}</p>
           </CardContent>
         </Card>
 

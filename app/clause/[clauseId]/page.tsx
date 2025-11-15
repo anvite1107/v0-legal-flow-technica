@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
 
 interface ClauseDetails {
   clauseId: string;
@@ -43,25 +42,38 @@ export default function ClauseDetailsPage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchClause = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    try {
+      setLoading(true);
+      let foundClause: ClauseDetails | null = null;
 
-        const response = await fetch(
-          `http://localhost:8000/clause/${params.clauseId}`
-        );
-        if (!response.ok) throw new Error('Failed to fetch clause details');
-        const data = await response.json();
-        setClause(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('document-')) {
+          const data = JSON.parse(localStorage.getItem(key) || '{}');
+          const matchedClause = data.clauses?.find(
+            (c: any) => c.clauseId === params.clauseId
+          );
+          if (matchedClause) {
+            const docId = key.replace('document-', '');
+            foundClause = {
+              ...matchedClause,
+              documentId: docId,
+            };
+            break;
+          }
+        }
       }
-    };
 
-    fetchClause();
+      if (!foundClause) {
+        throw new Error('Clause not found');
+      }
+
+      setClause(foundClause);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   }, [params.clauseId]);
 
   if (loading) {
@@ -95,15 +107,19 @@ export default function ClauseDetailsPage({
   return (
     <main className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-4xl">
-        {/* Back Button */}
-        <Link href={`/results/${clause.documentId}`}>
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Results
-          </Button>
-        </Link>
+        <div className="mb-6 flex gap-2">
+          <Link href={`/results/${clause.documentId}`}>
+            <Button variant="ghost">
+              ← Back to Results
+            </Button>
+          </Link>
+          <Link href="/">
+            <Button variant="outline">
+              Home
+            </Button>
+          </Link>
+        </div>
 
-        {/* Clause Header */}
         <Card className="mb-8">
           <CardHeader>
             <div className="flex items-start justify-between">
@@ -121,7 +137,6 @@ export default function ClauseDetailsPage({
           </CardHeader>
         </Card>
 
-        {/* Extracted Clause Text */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Extracted Clause Text</CardTitle>
@@ -135,7 +150,6 @@ export default function ClauseDetailsPage({
           </CardContent>
         </Card>
 
-        {/* Explanation */}
         <Card>
           <CardHeader>
             <CardTitle>Explanation (Plain English)</CardTitle>

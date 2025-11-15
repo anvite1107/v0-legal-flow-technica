@@ -12,13 +12,20 @@ export default function LandingPage() {
       <nav className="border-b border-border">
         <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-primary"></div>
               <span className="text-lg font-semibold text-foreground">LegalFlow</span>
-            </div>
-            <Link href="/">
-              <Button variant="default">Upload Contract</Button>
             </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/">
+                <Button variant="outline" size="sm">
+                  Back to Home
+                </Button>
+              </Link>
+              <Link href="/">
+                <Button variant="default">Upload Contract</Button>
+              </Link>
+            </div>
           </div>
         </div>
       </nav>
