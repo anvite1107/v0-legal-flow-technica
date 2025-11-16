@@ -7,6 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import React from 'react';
+import MedicalChartVisualizer from '@/components/MedicalChartVisualizer';
+import AdvancedMedicalVisualizer from '@/components/AdvancedMedicalVisualizer';
+import { parseVisualAidsFromText } from '@/lib/parseVisualAids';
 
 interface FlowchartNode {
   id: string;
@@ -135,21 +138,50 @@ function FlowchartRenderer({ data }: { data: FlowchartData }) {
 export default function FlowchartPage({
   params,
 }: {
-  params: { documentId: string };
+  params: Promise<{ documentId: string }>;
 }) {
   const router = useRouter();
   const [flowchart, setFlowchart] = useState<FlowchartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [documentId, setDocumentId] = useState<string>('');
+  const [summary, setSummary] = useState<string>('');
+  const [visualAids, setVisualAids] = useState<any[]>([]);
+  const [vizData, setVizData] = useState<any>(null);
 
   useEffect(() => {
     const fetchFlowchart = async () => {
       try {
         setLoading(true);
+        const resolvedParams = await params;
+        const docId = resolvedParams.documentId;
+        setDocumentId(docId);
+        
+        // Get document data from localStorage
+        const key = `document-${docId}`;
+        const storedData = localStorage.getItem(key);
+        
+        if (!storedData) {
+          throw new Error('Document data not found in localStorage');
+        }
+        
+        const documentData = JSON.parse(storedData);
+        
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for AI processing
 
-        const response = await fetch(`/api/flowchart?documentId=${params.documentId}`, {
+        // Send document data to API for flowchart generation (also requests AI summary)
+        const response = await fetch(`/api/flowchart?documentId=${docId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fileData: documentData.fileData || null,
+            extractedText: documentData.extractedText || '',
+            fileName: documentData.fileName || 'Unknown Document',
+            generateSummary: true, // Request AI-generated summary
+          }),
           signal: controller.signal,
         });
         
@@ -167,6 +199,28 @@ export default function FlowchartPage({
         }
 
         setFlowchart(data);
+        
+        // Set AI-generated summary if available
+        if (data.aiSummary) {
+          setSummary(data.aiSummary);
+          
+          // Store vizData from API
+          if (data.vizData) {
+            console.log('[Flowchart] Received visualization metadata:', data.vizData);
+            setVizData(data.vizData);
+          }
+          
+          // Parse visual aids from the summary (fallback)
+          try {
+            const parsedVisualAids = parseVisualAidsFromText(data.aiSummary);
+            console.log('[Flowchart] Parsed visual aids:', parsedVisualAids);
+            setVisualAids(parsedVisualAids);
+          } catch (parseError) {
+            console.error('[Flowchart] Error parsing visual aids:', parseError);
+          }
+        } else {
+          setSummary(documentData.summary || 'No summary available');
+        }
       } catch (err) {
         console.error('[v0] Error fetching flowchart:', err);
         setFlowchart({
@@ -186,12 +240,30 @@ export default function FlowchartPage({
     };
 
     fetchFlowchart();
-  }, [params.documentId]);
+  }, [params]);
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
-        <Spinner className="h-8 w-8" />
+      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+        <div className="text-center max-w-md">
+          <div className="mb-8">
+            <div className="inline-block animate-bounce">
+              <div className="text-8xl mb-4">🩺</div>
+            </div>
+          </div>
+          <Spinner />
+          <h2 className="mt-6 text-2xl font-bold text-gray-800 dark:text-gray-100">
+            Analyzing Your Medical Report
+          </h2>
+          <p className="mt-3 text-gray-600 dark:text-gray-400">
+            Our AI is carefully reading your report and preparing detailed visualizations...
+          </p>
+          <div className="mt-6 flex justify-center gap-2">
+            <div className="w-3 h-3 bg-indigo-500 rounded-full animate-pulse"></div>
+            <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse delay-75"></div>
+            <div className="w-3 h-3 bg-pink-500 rounded-full animate-pulse delay-150"></div>
+          </div>
+        </div>
       </main>
     );
   }
@@ -211,11 +283,11 @@ export default function FlowchartPage({
   }
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8">
+    <main className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 px-4 py-8">
       <div className="mx-auto max-w-6xl">
         {/* Navigation */}
         <div className="mb-6 flex gap-2">
-          <Link href={`/results/${params.documentId}`}>
+          <Link href={`/results/${documentId}`}>
             <Button variant="ghost">
               ← Back to Results
             </Button>
@@ -227,32 +299,241 @@ export default function FlowchartPage({
           </Link>
         </div>
 
-        {/* Header */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="text-3xl">Contract Processing Flowchart</CardTitle>
-          </CardHeader>
-        </Card>
+        {/* Hero Section with Gradient */}
+        <div className="mb-8 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl p-8 text-white shadow-2xl relative overflow-hidden">
+          <div className="absolute inset-0 bg-black opacity-10"></div>
+          <div className="relative z-10">
+            <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
+              <span className="text-5xl">🩺</span>
+              Your Medical Report Analysis
+            </h1>
+            <p className="text-indigo-100 text-lg">
+              Interactive visualization of your health data
+            </p>
+          </div>
+        </div>
 
-        {/* Flowchart Visualization */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Process Flow</CardTitle>
+        {/* Quick Summary Cards */}
+        {(vizData?.tests?.length > 0 || visualAids.length > 0) && (
+          <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 rounded-xl p-5 border-2 border-green-200 dark:border-green-800">
+              <div className="text-3xl mb-2">📊</div>
+              <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                {vizData?.tests?.length || visualAids.length}
+              </div>
+              <div className="text-sm text-green-600 dark:text-green-400 font-medium">Tests Analyzed</div>
+            </div>
+            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950 rounded-xl p-5 border-2 border-blue-200 dark:border-blue-800">
+              <div className="text-3xl mb-2">✓</div>
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                {vizData?.tests 
+                  ? vizData.tests.filter((t: any) => t.severity === 'normal').length
+                  : visualAids.filter(v => v.patientValue >= v.normalMin && v.patientValue <= v.normalMax).length
+                }
+              </div>
+              <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">Normal Results</div>
+            </div>
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950 dark:to-orange-950 rounded-xl p-5 border-2 border-amber-200 dark:border-amber-800">
+              <div className="text-3xl mb-2">⚠</div>
+              <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                {vizData?.tests 
+                  ? vizData.tests.filter((t: any) => t.severity !== 'normal').length
+                  : visualAids.filter(v => v.patientValue < v.normalMin || v.patientValue > v.normalMax).length
+                }
+              </div>
+              <div className="text-sm text-amber-600 dark:text-amber-400 font-medium">Needs Attention</div>
+            </div>
+          </div>
+        )}
+
+        {/* Interactive Charts Section */}
+        {vizData && vizData.tests && vizData.tests.length > 0 ? (
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold mb-6 text-gray-800 dark:text-gray-100 flex items-center gap-3">
+              <span className="text-4xl">📈</span>
+              Your Test Results Visualized
+            </h2>
+            
+            {/* Affected Organs Summary */}
+            {vizData.affectedOrgans && vizData.affectedOrgans.length > 0 && (
+              <div className="mb-6 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950 dark:to-purple-950 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                <h3 className="font-bold text-lg mb-3 text-indigo-900 dark:text-indigo-100">
+                  🫁 Affected Systems/Organs
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {vizData.affectedOrgans.map((organ: string, idx: number) => (
+                    <span
+                      key={idx}
+                      className="px-4 py-2 bg-white dark:bg-slate-800 rounded-full text-sm font-medium border border-indigo-200 dark:border-indigo-700"
+                    >
+                      {organ.charAt(0).toUpperCase() + organ.slice(1)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Advanced Visualizations - 2x2 Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {vizData.tests.map((test: any, index: number) => (
+                <AdvancedMedicalVisualizer 
+                  key={index} 
+                  test={test} 
+                  reportType={vizData.reportType}
+                />
+              ))}
+            </div>
+          </div>
+        ) : visualAids.length > 0 ? (
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold mb-6 text-gray-800 dark:text-gray-100 flex items-center gap-3">
+              <span className="text-4xl">📈</span>
+              Your Test Results Visualized
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {visualAids.map((aid, index) => (
+                <MedicalChartVisualizer key={index} data={aid} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Text Analysis Section - Collapsible */}
+        <Card className="mb-8 border-2 border-gray-200 dark:border-gray-700 shadow-xl">
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
+            <CardTitle className="text-2xl flex items-center gap-3">
+              <span className="text-3xl">📋</span>
+              Detailed Analysis
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <FlowchartRenderer data={flowchart} />
+          <CardContent className="pt-6">
+            <div className="prose prose-slate max-w-none">
+              <div className="text-foreground leading-relaxed space-y-4">
+                {(() => {
+                  const lines = summary.split('\n');
+                  const elements: React.ReactNode[] = [];
+                  let visualAidIndex = 0;
+                  let inVisualAidSection = false;
+
+                  for (let idx = 0; idx < lines.length; idx++) {
+                    const line = lines[idx];
+
+                    // Check for Visual Aid section start
+                    if (line.match(/^### 📊/)) {
+                      inVisualAidSection = true;
+                      
+                      // Inject the actual chart instead of instructions
+                      if (visualAidIndex < visualAids.length) {
+                        elements.push(
+                          <MedicalChartVisualizer 
+                            key={`chart-${visualAidIndex}`}
+                            data={visualAids[visualAidIndex]}
+                          />
+                        );
+                        visualAidIndex++;
+                      }
+                      
+                      // Skip all lines until next ### or ## section
+                      continue;
+                    }
+
+                    // Check if we're exiting visual aid section
+                    if (inVisualAidSection && (line.match(/^###/) || line.match(/^##/))) {
+                      inVisualAidSection = false;
+                    }
+
+                    // Skip lines within visual aid instruction section
+                    if (inVisualAidSection) {
+                      continue;
+                    }
+
+                    // Main title (# heading)
+                    if (line.match(/^# /)) {
+                      elements.push(
+                        <div key={idx} className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950 dark:to-purple-950 rounded-lg p-4 my-6 border-l-4 border-indigo-500">
+                          <h1 className="font-bold text-3xl text-indigo-700 dark:text-indigo-300">
+                            {line.replace(/^# /, '')}
+                          </h1>
+                        </div>
+                      );
+                      continue;
+                    }
+
+                    // Section headings (## heading)
+                    if (line.match(/^## /)) {
+                      elements.push(
+                        <h2 key={idx} className="font-bold text-2xl mt-8 mb-4 text-gray-800 dark:text-gray-100 border-b-2 border-indigo-200 dark:border-indigo-800 pb-3 flex items-center gap-2">
+                          <span className="text-indigo-500">▸</span>
+                          {line.replace(/^## /, '')}
+                        </h2>
+                      );
+                      continue;
+                    }
+
+                    // Subsection headings (### with emoji)
+                    if (line.match(/^### 🔹/)) {
+                      elements.push(
+                        <div key={idx} className="bg-blue-50 dark:bg-blue-950 rounded-lg p-4 my-4 border-l-4 border-blue-500">
+                          <h3 className="font-bold text-xl text-blue-700 dark:text-blue-300">
+                            {line.replace(/^### /, '')}
+                          </h3>
+                        </div>
+                      );
+                      continue;
+                    }
+
+                    // Bold text (**text**)
+                    if (line.match(/^\*\*.*\*\*$/)) {
+                      elements.push(
+                        <div key={idx} className="font-bold text-lg mt-4 mb-2 text-gray-800 dark:text-gray-200">
+                          {line.replace(/\*\*/g, '')}
+                        </div>
+                      );
+                      continue;
+                    }
+
+                    // Bullet points
+                    if (line.match(/^[•\-]/)) {
+                      elements.push(
+                        <div key={idx} className="ml-6 my-2 flex items-start gap-2">
+                          <span className="text-indigo-500 mt-1">●</span>
+                          <span className="flex-1">{line.replace(/^[•\-]\s*/, '')}</span>
+                        </div>
+                      );
+                      continue;
+                    }
+
+                    // Indented content
+                    if (line.match(/^\s{2,}/)) {
+                      elements.push(
+                        <div key={idx} className="ml-8 my-1 text-sm text-gray-600 dark:text-gray-400 italic">
+                          {line}
+                        </div>
+                      );
+                      continue;
+                    }
+
+                    // Regular paragraphs
+                    if (line.trim()) {
+                      elements.push(
+                        <p key={idx} className="my-3 text-gray-700 dark:text-gray-300 leading-relaxed">
+                          {line}
+                        </p>
+                      );
+                      continue;
+                    }
+
+                    // Empty lines
+                    elements.push(<div key={idx} className="h-3" />);
+                  }
+
+                  return elements;
+                })()}
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Description */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Flow Description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="leading-relaxed text-foreground">{flowchart.description}</p>
-          </CardContent>
-        </Card>
       </div>
     </main>
   );

@@ -1,4 +1,6 @@
-# Upload page component
+# VitalView AI - Medical Report Analysis
+
+AI-powered medical report analysis platform that transforms complex medical documents into clear, visual insights.
 
 *Automatically synced with your [v0.app](https://v0.app) deployments*
 

@@ -1,5 +1,5 @@
 {
-  "name": "my-v0-project",
+  "name": "vitalview-ai",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -46,17 +47,18 @@
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.1",
+    "framer-motion": "^12.23.24",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "next": "16.0.3",
     "next-themes": "latest",
-    "openai": "latest",
+    "pdfjs-dist": "4.10.38",
     "react": "19.2.0",
     "react-day-picker": "9.8.0",
     "react-dom": "19.2.0",
     "react-hook-form": "^7.60.0",
     "react-resizable-panels": "^2.1.7",
-    "recharts": "2.15.4",
+    "recharts": "^2.15.4",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",

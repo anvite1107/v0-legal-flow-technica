@@ -6,9 +6,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'VitalView AI - Understand Your Medical Reports',
+  description: 'AI-powered medical report analysis. Transform complex medical documents into clear, visual insights.',
   icons: {
     icon: [
       {
